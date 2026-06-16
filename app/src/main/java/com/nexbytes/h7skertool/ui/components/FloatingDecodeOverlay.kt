@@ -62,20 +62,46 @@ fun FloatingDecodeOverlay(
 
     val currentText = if (tabIdx == 0) request.bodyText else response?.bodyText
     val currentHex = if (tabIdx == 0) request.body?.let { HexUtils.toHexDump(it) } ?: request.bodyHex ?: "" else response?.body?.let { HexUtils.toHexDump(it) } ?: response?.bodyHex ?: ""
-    val cleanHex = if (tabIdx == 0) request.body?.let { HexUtils.toCleanHex(it) } ?: "" else response?.body?.let { HexUtils.toCleanHex(it) } ?: ""
+    val cleanHex = if (tabIdx == 0) request.body?.let { HexUtils.toCleanHex(it) } ?: request.bodyHex ?: "" else response?.body?.let { HexUtils.toCleanHex(it) } ?: response?.bodyHex ?: ""
     val localDecoded = remember(tabIdx) { currentText?.let { DecodeUtils.prettyPrintJson(it) } ?: currentText ?: "(empty)" }
 
     fun decodeViaApi() {
-        val hex = cleanHex.ifEmpty { return }
-        isDecoding = true; decodedResult = null; decodeError = null
+        // Remove all spaces and newlines from hex
+        val hex = cleanHex.replace("\\s".toRegex(), "")
+        
+        if (hex.isEmpty()) {
+            decodeError = "No hex data to decode"
+            return
+        }
+        
+        isDecoding = true
+        decodedResult = null
+        decodeError = null
+        
         scope.launch {
             try {
                 val url = if (tabIdx == 0) "http://node.mrkalpha.tech:19140/request" else "http://node.mrkalpha.tech:19140/response"
                 val body = JSONObject().apply { put("hex", hex) }.toString().toRequestBody("application/json".toMediaTypeOrNull())
                 val resp = withContext(Dispatchers.IO) { http.newCall(Request.Builder().url(url).post(body).build()).execute() }
                 val txt = resp.body?.string() ?: ""
-                withContext(Dispatchers.Main) { isDecoding = false; decodedResult = DecodeUtils.prettyPrintJson(txt) }
-            } catch (e: Exception) { withContext(Dispatchers.Main) { isDecoding = false; decodeError = "Decode API error: ${e.message}" } }
+                withContext(Dispatchers.Main) {
+                    isDecoding = false
+                    if (txt.isNotEmpty()) {
+                        try {
+                            decodedResult = DecodeUtils.prettyPrintJson(txt)
+                        } catch (e: Exception) {
+                            decodedResult = txt
+                        }
+                    } else {
+                        decodeError = "Empty response from server"
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    isDecoding = false
+                    decodeError = "Decode API error: ${e.message}"
+                }
+            }
         }
     }
 
