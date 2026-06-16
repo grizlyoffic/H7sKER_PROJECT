@@ -6,10 +6,18 @@ object ConversionUtils {
     fun hexToBase64(hex: String): String? { val b = HexUtils.hexToBytes(hex) ?: return null; return Base64.encodeToString(b, Base64.NO_WRAP) }
     fun base64ToHex(b64: String): String? { val b = try { Base64.decode(b64, Base64.DEFAULT) } catch (_: Exception) { return null }; return HexUtils.toCleanHex(b) }
     fun hexToBinary(hex: String): String? { val b = HexUtils.hexToBytes(hex) ?: return null; return b.joinToString(" ") { x -> String.format("%8s", Integer.toBinaryString(x.toInt() and 0xFF)).replace(' ', '0') } }
-    fun binaryToHex(binary: String): String? = try {
-        val c = binary.replace(" ", "").replace("\n", ""); if (c.length % 8 != 0) return null
-        HexUtils.toCleanHex(ByteArray(c.length / 8) { i -> c.substring(i * 8, i * 8 + 8).toInt(2).toByte() })
-    } catch (_: Exception) { null }
+    
+    // YAHAN FIX KIYA HAI: Block body use ki hai taaki 'return null' kaam kar sake
+    fun binaryToHex(binary: String): String? {
+        return try {
+            val c = binary.replace(" ", "").replace("\n", "")
+            if (c.length % 8 != 0) return null
+            HexUtils.toCleanHex(ByteArray(c.length / 8) { i -> c.substring(i * 8, i * 8 + 8).toInt(2).toByte() })
+        } catch (_: Exception) { 
+            null 
+        }
+    }
+    
     fun hexToUtf8(hex: String): String? { val b = HexUtils.hexToBytes(hex) ?: return null; return try { String(b, Charsets.UTF_8) } catch (_: Exception) { null } }
     fun utf8ToHex(text: String): String = HexUtils.toCleanHex(text.toByteArray(Charsets.UTF_8))
     fun hexToDecimal(hex: String): String? { val b = HexUtils.hexToBytes(hex.replace(" ", "")) ?: return null; if (b.size > 8) return null; var v = 0L; for (x in b) { v = (v shl 8) or (x.toLong() and 0xFF) }; return v.toString() }
